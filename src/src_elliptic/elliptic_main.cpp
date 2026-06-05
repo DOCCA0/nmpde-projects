@@ -11,7 +11,7 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria.h>
+#include <deal.II/distributed/tria.h>
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -37,6 +37,13 @@ namespace
 {
   constexpr unsigned int dim = 3;
 
+  const std::vector<double> study_p_values = {1.0, 3.0, 5.0};
+
+  const std::vector<unsigned int> study_refinements = {3, 4, 5};
+
+  const std::vector<std::string> study_preconditioners = {
+    "none", "jacobi", "ssor", "ilu", "amg"};
+
   struct Ball
   {
     Point<dim> center;
@@ -46,9 +53,18 @@ namespace
   std::vector<Ball>
   make_balls()
   {
-    return {{{0.30, 0.30, 0.30}, 0.18},
-            {{0.70, 0.35, 0.55}, 0.16},
-            {{0.45, 0.75, 0.70}, 0.14}};
+    return {{{0.18, 0.20, 0.23}, 0.090},
+            {{0.34, 0.28, 0.72}, 0.075},
+            {{0.52, 0.18, 0.46}, 0.080},
+            {{0.76, 0.24, 0.32}, 0.070},
+            {{0.24, 0.52, 0.55}, 0.085},
+            {{0.48, 0.48, 0.22}, 0.070},
+            {{0.68, 0.56, 0.78}, 0.095},
+            {{0.86, 0.62, 0.50}, 0.060},
+            {{0.30, 0.78, 0.30}, 0.075},
+            {{0.55, 0.82, 0.60}, 0.090},
+            {{0.78, 0.84, 0.20}, 0.070},
+            {{0.14, 0.86, 0.82}, 0.065}};
   }
 
   double
@@ -96,44 +112,55 @@ namespace
 
   void
   setup_problem(const unsigned int                      refinements,
-                Triangulation<dim>                    &mesh,
+                parallel::distributed::Triangulation<dim> &mesh,
                 FE_Q<dim>                             &fe,
                 DoFHandler<dim>                       &dof_handler,
                 AffineConstraints<double>             &constraints,
                 TrilinosWrappers::SparsityPattern     &sparsity_pattern,
                 TrilinosWrappers::SparseMatrix        &system_matrix,
                 TrilinosWrappers::MPI::Vector         &solution,
-                TrilinosWrappers::MPI::Vector         &system_rhs)
+                TrilinosWrappers::MPI::Vector         &system_rhs,
+                IndexSet                              &locally_owned_dofs,
+                IndexSet                              &locally_relevant_dofs,
+                const MPI_Comm                         mpi_communicator)
   {
     GridGenerator::hyper_cube(mesh, 0.0, 1.0);
     mesh.refine_global(refinements);
 
     dof_handler.distribute_dofs(fe);
 
+    locally_owned_dofs = dof_handler.locally_owned_dofs();
+    DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
+
     constraints.clear();
+    constraints.reinit(locally_relevant_dofs);
     VectorTools::interpolate_boundary_values(dof_handler,
                                              0,
                                              Functions::ZeroFunction<dim>(),
                                              constraints);
     constraints.close();
 
-    DynamicSparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs());
-    DoFTools::make_sparsity_pattern(dof_handler, dsp, constraints, false);
-
-    IndexSet owned_dofs(dof_handler.n_dofs());
-    owned_dofs.add_range(0, dof_handler.n_dofs());
-
-    sparsity_pattern.reinit(owned_dofs,
-                            owned_dofs,
-                            dsp,
-                            MPI_COMM_WORLD);
+    sparsity_pattern.reinit(locally_owned_dofs,
+                            locally_owned_dofs,
+                            locally_relevant_dofs,
+                            mpi_communicator);
+    DoFTools::make_sparsity_pattern(dof_handler,
+                                    sparsity_pattern,
+                                    constraints,
+                                    false,
+                                    Utilities::MPI::this_mpi_process(
+                                      mpi_communicator));
+    sparsity_pattern.compress();
     system_matrix.reinit(sparsity_pattern);
 
-    solution.reinit(owned_dofs, MPI_COMM_WORLD);
-    system_rhs.reinit(owned_dofs, MPI_COMM_WORLD);
+    solution.reinit(locally_owned_dofs, mpi_communicator);
+    system_rhs.reinit(locally_owned_dofs, mpi_communicator);
 
-    std::cout << "cells " << mesh.n_active_cells() << std::endl;
-    std::cout << "dofs " << dof_handler.n_dofs() << std::endl;
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+      {
+        std::cout << "cells " << mesh.n_global_active_cells() << std::endl;
+        std::cout << "dofs " << dof_handler.n_dofs() << std::endl;
+      }
   }
 
   void
@@ -166,6 +193,9 @@ namespace
 
     for (const auto &cell : dof_handler.active_cell_iterators())
       {
+        if (!cell->is_locally_owned())
+          continue;
+
         fe_values.reinit(cell);
         cell_matrix = 0.0;
         cell_rhs    = 0.0;
@@ -204,7 +234,9 @@ namespace
            const TrilinosWrappers::MPI::Vector    &system_rhs,
            TrilinosWrappers::MPI::Vector          &solution,
            const Preconditioner                   &preconditioner,
-           const std::string                      &name)
+           const std::string                      &name,
+           const double                            setup_time,
+           const MPI_Comm                          mpi_communicator)
   {
     SolverControl solver_control(20000, 1e-10 * system_rhs.l2_norm());
     SolverCG<TrilinosWrappers::MPI::Vector> solver(solver_control);
@@ -213,56 +245,110 @@ namespace
     solver.solve(system_matrix, solution, system_rhs, preconditioner);
     timer.stop();
 
-    std::cout << name << " " << solver_control.last_step() << " "
-              << timer.wall_time() << std::endl;
+    const double solve_time =
+      Utilities::MPI::max(timer.wall_time(), mpi_communicator);
+    const double setup_time_global =
+      Utilities::MPI::max(setup_time, mpi_communicator);
+
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+      std::cout << "result " << name << " " << solver_control.last_step()
+                << " " << setup_time_global << " " << solve_time << " "
+                << setup_time_global + solve_time << std::endl;
 
     return solver_control.last_step();
   }
 
-  unsigned int
+  void
   solve_with_preconditioner(const std::string                  &name,
                             const TrilinosWrappers::SparseMatrix &system_matrix,
                             const TrilinosWrappers::MPI::Vector  &system_rhs,
-                            TrilinosWrappers::MPI::Vector        &solution)
+                            TrilinosWrappers::MPI::Vector        &solution,
+                            const MPI_Comm                        mpi_communicator)
   {
     solution = 0.0;
 
-    if (name == "none")
-      return solve_cg(system_matrix,
-                      system_rhs,
-                      solution,
-                      PreconditionIdentity(),
-                      name);
-
-    if (name == "jacobi")
+    try
       {
-        TrilinosWrappers::PreconditionJacobi preconditioner;
-        preconditioner.initialize(system_matrix);
-        return solve_cg(system_matrix, system_rhs, solution, preconditioner, name);
-      }
+        if (name == "none")
+          {
+            solve_cg(system_matrix,
+                     system_rhs,
+                     solution,
+                     PreconditionIdentity(),
+                     name,
+                     0.0,
+                     mpi_communicator);
+            return;
+          }
 
-    if (name == "ssor")
+        Timer timer;
+
+        if (name == "jacobi")
+          {
+            TrilinosWrappers::PreconditionJacobi preconditioner;
+            preconditioner.initialize(system_matrix);
+            timer.stop();
+            solve_cg(system_matrix,
+                     system_rhs,
+                     solution,
+                     preconditioner,
+                     name,
+                     timer.wall_time(),
+                     mpi_communicator);
+            return;
+          }
+
+        if (name == "ssor")
+          {
+            TrilinosWrappers::PreconditionSSOR preconditioner;
+            preconditioner.initialize(system_matrix);
+            timer.stop();
+            solve_cg(system_matrix,
+                     system_rhs,
+                     solution,
+                     preconditioner,
+                     name,
+                     timer.wall_time(),
+                     mpi_communicator);
+            return;
+          }
+
+        if (name == "ilu")
+          {
+            TrilinosWrappers::PreconditionILU preconditioner;
+            preconditioner.initialize(system_matrix);
+            timer.stop();
+            solve_cg(system_matrix,
+                     system_rhs,
+                     solution,
+                     preconditioner,
+                     name,
+                     timer.wall_time(),
+                     mpi_communicator);
+            return;
+          }
+
+        TrilinosWrappers::PreconditionAMG preconditioner;
+        TrilinosWrappers::PreconditionAMG::AdditionalData data;
+        data.elliptic              = true;
+        data.higher_order_elements = true;
+        data.n_cycles              = 1;
+        preconditioner.initialize(system_matrix, data);
+        timer.stop();
+        solve_cg(system_matrix,
+                 system_rhs,
+                 solution,
+                 preconditioner,
+                 "amg",
+                 timer.wall_time(),
+                 mpi_communicator);
+      }
+    catch (const std::exception &exception)
       {
-        TrilinosWrappers::PreconditionSSOR preconditioner;
-        preconditioner.initialize(system_matrix);
-        return solve_cg(system_matrix, system_rhs, solution, preconditioner, name);
+        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+          std::cout << "failed " << name << " " << exception.what()
+                    << std::endl;
       }
-
-    if (name == "ilu")
-      {
-        TrilinosWrappers::PreconditionILU preconditioner;
-        preconditioner.initialize(system_matrix);
-        return solve_cg(system_matrix, system_rhs, solution, preconditioner, name);
-      }
-
-    TrilinosWrappers::PreconditionAMG preconditioner;
-    TrilinosWrappers::PreconditionAMG::AdditionalData data;
-    data.elliptic              = true;
-    data.higher_order_elements = true;
-    data.n_cycles              = 1;
-    preconditioner.initialize(system_matrix, data);
-
-    return solve_cg(system_matrix, system_rhs, solution, preconditioner, "amg");
   }
 
   void
@@ -293,13 +379,25 @@ namespace
   void
   run_case(const double                    p,
            const unsigned int              refinements,
-           const std::vector<std::string> &preconditioners)
+           const std::vector<std::string> &preconditioners,
+           const MPI_Comm                  mpi_communicator)
   {
-    std::cout << "p " << p << std::endl;
+    const unsigned int my_rank =
+      Utilities::MPI::this_mpi_process(mpi_communicator);
+
+    if (my_rank == 0)
+      {
+        std::cout << "mpi_procs "
+                  << Utilities::MPI::n_mpi_processes(mpi_communicator)
+                  << std::endl;
+        std::cout << "p " << p << std::endl;
+        std::cout << "refinements " << refinements << std::endl;
+        std::cout << "balls " << make_balls().size() << std::endl;
+      }
 
     const std::vector<Ball> balls = make_balls();
 
-    Triangulation<dim>                mesh;
+    parallel::distributed::Triangulation<dim> mesh(mpi_communicator);
     FE_Q<dim>                         fe(1);
     DoFHandler<dim>                   dof_handler(mesh);
     AffineConstraints<double>         constraints;
@@ -307,7 +405,10 @@ namespace
     TrilinosWrappers::SparseMatrix    system_matrix;
     TrilinosWrappers::MPI::Vector     solution;
     TrilinosWrappers::MPI::Vector     system_rhs;
+    IndexSet                          locally_owned_dofs;
+    IndexSet                          locally_relevant_dofs;
 
+    Timer timer;
     setup_problem(refinements,
                   mesh,
                   fe,
@@ -316,8 +417,15 @@ namespace
                   sparsity_pattern,
                   system_matrix,
                   solution,
-                  system_rhs);
+                  system_rhs,
+                  locally_owned_dofs,
+                  locally_relevant_dofs,
+                  mpi_communicator);
+    timer.stop();
+    const double setup_time =
+      Utilities::MPI::max(timer.wall_time(), mpi_communicator);
 
+    timer.restart();
     assemble_system(dof_handler,
                     fe,
                     constraints,
@@ -325,19 +433,30 @@ namespace
                     balls,
                     system_matrix,
                     system_rhs);
+    timer.stop();
+    const double assembly_time =
+      Utilities::MPI::max(timer.wall_time(), mpi_communicator);
+
+    if (my_rank == 0)
+      std::cout << "case_setup " << setup_time << std::endl
+                << "assembly " << assembly_time << std::endl;
 
     for (const auto &preconditioner : preconditioners)
       solve_with_preconditioner(preconditioner,
                                 system_matrix,
                                 system_rhs,
-                                solution);
+                                solution,
+                                mpi_communicator);
 
-    write_vtk(dof_handler, p, balls, solution);
+    if (Utilities::MPI::n_mpi_processes(mpi_communicator) == 1)
+      write_vtk(dof_handler, p, balls, solution);
   }
 
   void
   run_project(int argc, char **argv)
   {
+    const MPI_Comm mpi_communicator = MPI_COMM_WORLD;
+
     const unsigned int refinements =
       argc > 2 ? static_cast<unsigned int>(std::stoi(argv[2])) : 4;
 
@@ -347,12 +466,15 @@ namespace
         const std::vector<std::string> preconditioners =
           argc > 3 ? std::vector<std::string>{argv[3]} :
                      std::vector<std::string>{"none", "jacobi", "ssor", "ilu", "amg"};
-        run_case(p, refinements, preconditioners);
+        run_case(p, refinements, preconditioners, mpi_communicator);
         return;
       }
 
-    for (const double p : {1.0, 3.0, 5.0})
-      run_case(p, refinements, {"none", "jacobi", "ssor", "ilu", "amg"});
+    (void)refinements;
+
+    for (const unsigned int study_refinement : study_refinements)
+      for (const double p : study_p_values)
+        run_case(p, study_refinement, study_preconditioners, mpi_communicator);
   }
 } // namespace
 
