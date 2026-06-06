@@ -37,7 +37,7 @@ namespace
 {
   constexpr unsigned int dim = 3;
 
-  const std::vector<double> study_p_values = {1.0, 3.0, 5.0};
+  const std::vector<double> study_p_values = {1.0, 2.0, 3.0, 4.0, 5.0};
 
   const std::vector<unsigned int> study_refinements = {3, 4, 5};
 

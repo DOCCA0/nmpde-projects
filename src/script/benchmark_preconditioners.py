@@ -17,7 +17,7 @@ EXECUTABLE = ROOT / "build" / "elliptic"
 SETUP = ROOT / "setup_modules.sh"
 CSV_FILE = RESULT / "benchmark_results.csv"
 
-MPI_PROCS = [1, 2, 4]
+MPI_PROCS = [1, 2, 3, 4]
 PRECONDITIONERS = ["none", "jacobi", "ssor", "ilu", "amg"]
 
 RESULT_RE = re.compile(
@@ -159,6 +159,31 @@ def row_for(rows: list[dict[str, str]], np: str, p: str, ref: str, prec: str):
     return None
 
 
+def sorted_values(rows: list[dict[str, str]], key: str) -> list[str]:
+    values = {row[key] for row in rows if row.get(key, "")}
+    return sorted(values, key=float)
+
+
+def first_value(rows: list[dict[str, str]], key: str) -> str:
+    values = sorted_values(rows, key)
+    return values[0] if values else ""
+
+
+def last_value(rows: list[dict[str, str]], key: str) -> str:
+    values = sorted_values(rows, key)
+    return values[-1] if values else ""
+
+
+def number_label(value: str | float) -> str:
+    value = float(value)
+    return str(int(value)) if value.is_integer() else f"{value:g}"
+
+
+def positive_max(values: list[float], fallback: float) -> float:
+    values = [value for value in values if value > 0]
+    return max(values) if values else fallback
+
+
 def svg_start(title: str, width: int = 860, height: int = 520) -> list[str]:
     return [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
@@ -208,17 +233,43 @@ def draw_y_labels(
         lines.append(f'<text class="label" x="42" y="{y + 4:.1f}">{text}</text>')
 
 
+def draw_line_legend(
+    lines: list[str],
+    label: str,
+    color: str,
+    y: float,
+    dashed: bool = False,
+) -> None:
+    dash = ' stroke-dasharray="6,5"' if dashed else ""
+    lines.append(
+        f'<line x1="690" y1="{y:.1f}" x2="724" y2="{y:.1f}" '
+        f'stroke="{color}" stroke-width="3"{dash}/>'
+    )
+    lines.append(f'<circle cx="707" cy="{y:.1f}" r="3.5" fill="{color}"/>')
+    lines.append(f'<text x="734" y="{y + 4:.1f}">{label}</text>')
+
+
 def plot_iterations_vs_p(rows: list[dict[str, str]]) -> str:
     path = PLOTS / "iterations_vs_heterogeneity_ref5_np1.svg"
     left, right, top, bottom = 80, 650, 60, 430
     colors = ["#1d4ed8", "#dc2626", "#059669", "#7c3aed", "#ea580c"]
-    lines = svg_start("Iterations vs heterogeneity, ref=5, np=1")
+    p_values = sorted_values(rows, "p")
+    ref = last_value(rows, "refinements")
+    np = first_value(rows, "mpi_procs")
+    selected = [
+        row
+        for row in rows
+        if row["mpi_procs"] == np and row["refinements"] == ref
+    ]
+    max_iterations = positive_max([float(row["iterations"]) for row in selected], 10.0)
+    y_max = 10 ** math.ceil(math.log10(max_iterations))
+    lines = svg_start(f"Iterations vs heterogeneity, ref={number_label(ref)}, np={number_label(np)}")
     draw_axes(lines, "CG iterations, log scale", left, right, top, bottom)
     draw_y_labels(
         lines,
         [("1", 1), ("10", 10), ("100", 100), ("1k", 1000), ("10k", 10000)],
         1,
-        20000,
+        y_max,
         top,
         bottom,
         True,
@@ -226,11 +277,11 @@ def plot_iterations_vs_p(rows: list[dict[str, str]]) -> str:
 
     for index, prec in enumerate(PRECONDITIONERS):
         points = []
-        for p_value in ["1", "3", "5"]:
-            row = row_for(rows, "1", p_value, "5", prec)
+        for p_value in p_values:
+            row = row_for(rows, np, p_value, ref, prec)
             if row:
-                x = x_pos(float(p_value), 1, 5, left, right)
-                y = y_pos(float(row["iterations"]), 1, 20000, top, bottom, True)
+                x = x_pos(float(p_value), float(p_values[0]), float(p_values[-1]), left, right)
+                y = y_pos(float(row["iterations"]), 1, y_max, top, bottom, True)
                 points.append((x, y))
         lines.append(
             f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in points)}" '
@@ -238,11 +289,11 @@ def plot_iterations_vs_p(rows: list[dict[str, str]]) -> str:
         )
         for x, y in points:
             lines.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{colors[index]}"/>')
-        lines.append(f'<text x="690" y="{78 + 24 * index}" fill="{colors[index]}">{prec}</text>')
+        draw_line_legend(lines, prec, colors[index], 78 + 24 * index)
 
-    for p_value in [1, 3, 5]:
-        x = x_pos(p_value, 1, 5, left, right)
-        lines.append(f'<text class="label" x="{x-5:.1f}" y="454">{p_value}</text>')
+    for p_value in p_values:
+        x = x_pos(float(p_value), float(p_values[0]), float(p_values[-1]), left, right)
+        lines.append(f'<text class="label" x="{x-5:.1f}" y="454">{number_label(p_value)}</text>')
     lines.append('<text class="label" x="335" y="492">heterogeneity exponent p</text>')
     return write_svg(path, lines)
 
@@ -250,13 +301,27 @@ def plot_iterations_vs_p(rows: list[dict[str, str]]) -> str:
 def plot_total_time(rows: list[dict[str, str]]) -> str:
     path = PLOTS / "total_time_p5_ref5_np1.svg"
     left, right, top, bottom = 80, 760, 60, 430
-    lines = svg_start("Total time by preconditioner, p=5, ref=5, np=1")
+    p = last_value(rows, "p")
+    ref = last_value(rows, "refinements")
+    np = first_value(rows, "mpi_procs")
+    selected = [
+        row
+        for row in rows
+        if row["mpi_procs"] == np and row["p"] == p and row["refinements"] == ref
+    ]
+    max_time = positive_max([float(row["total_s"]) for row in selected], 1.0)
+    min_time = max(min(float(row["total_s"]) for row in selected), 1e-3)
+    y_min = 10 ** math.floor(math.log10(min_time))
+    y_max = 10 ** math.ceil(math.log10(max_time))
+    lines = svg_start(
+        f"Total time by preconditioner, p={number_label(p)}, ref={number_label(ref)}, np={number_label(np)}"
+    )
     draw_axes(lines, "seconds, log scale", left, right, top, bottom)
     draw_y_labels(
         lines,
-        [("0.05", 0.05), ("0.1", 0.1), ("1", 1), ("5", 5)],
-        0.05,
-        8.0,
+        [(f"{value:g}", value) for value in [y_min, y_min * 10, y_min * 100, y_max] if value <= y_max],
+        y_min,
+        y_max,
         top,
         bottom,
         True,
@@ -265,12 +330,12 @@ def plot_total_time(rows: list[dict[str, str]]) -> str:
     colors = ["#1d4ed8", "#dc2626", "#059669", "#7c3aed", "#ea580c"]
 
     for index, prec in enumerate(PRECONDITIONERS):
-        row = row_for(rows, "1", "5", "5", prec)
+        row = row_for(rows, np, p, ref, prec)
         if not row:
             continue
         value = float(row["total_s"])
         x = left + slot * index + slot * 0.22
-        y = y_pos(value, 0.05, 8.0, top, bottom, True)
+        y = y_pos(value, y_min, y_max, top, bottom, True)
         lines.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{slot * 0.56:.1f}" height="{bottom-y:.1f}" fill="{colors[index]}"/>')
         lines.append(f'<text class="label" x="{x:.1f}" y="454">{prec}</text>')
         lines.append(f'<text class="label" x="{x:.1f}" y="{y-8:.1f}">{value:.3g}s</text>')
@@ -281,49 +346,64 @@ def plot_strong_scaling(rows: list[dict[str, str]]) -> str:
     path = PLOTS / "strong_scaling_p5_ref5.svg"
     left, right, top, bottom = 80, 650, 60, 430
     colors = ["#1d4ed8", "#dc2626", "#059669", "#7c3aed", "#ea580c"]
-    lines = svg_start("Strong scaling, p=5, ref=5")
+    p = last_value(rows, "p")
+    ref = last_value(rows, "refinements")
+    np_values = sorted_values(rows, "mpi_procs")
+    x_min = float(np_values[0])
+    x_max = float(np_values[-1])
+    speedups = []
+    for prec in PRECONDITIONERS:
+        serial = row_for(rows, np_values[0], p, ref, prec)
+        if serial:
+            serial_time = float(serial["total_s"])
+            for np in np_values:
+                row = row_for(rows, np, p, ref, prec)
+                if row:
+                    speedups.append(serial_time / float(row["total_s"]))
+    y_max = max(x_max, math.ceil(positive_max(speedups, x_max)))
+    lines = svg_start(f"Strong scaling, p={number_label(p)}, ref={number_label(ref)}")
     draw_axes(lines, "speedup", left, right, top, bottom)
     draw_y_labels(
         lines,
-        [("0", 0), ("1", 1), ("2", 2), ("3", 3), ("4", 4)],
+        [(number_label(value), value) for value in range(0, int(y_max) + 1)],
         0,
-        4,
+        y_max,
         top,
         bottom,
         False,
     )
     ideal_points = [
-        (x_pos(float(np), 1, 4, left, right), y_pos(float(np), 0, 4, top, bottom, False))
-        for np in [1, 2, 4]
+        (x_pos(float(np), x_min, x_max, left, right), y_pos(float(np), 0, y_max, top, bottom, False))
+        for np in np_values
     ]
     lines.append(
         f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in ideal_points)}" '
         f'fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="6,5"/>'
     )
-    lines.append('<text x="690" y="198" fill="#64748b">ideal</text>')
+    draw_line_legend(lines, "ideal", "#64748b", 198, dashed=True)
 
     for index, prec in enumerate(PRECONDITIONERS):
-        serial = row_for(rows, "1", "5", "5", prec)
+        serial = row_for(rows, np_values[0], p, ref, prec)
         if not serial:
             continue
         serial_time = float(serial["total_s"])
         points = []
-        for np in ["1", "2", "4"]:
-            row = row_for(rows, np, "5", "5", prec)
+        for np in np_values:
+            row = row_for(rows, np, p, ref, prec)
             if row:
                 speedup = serial_time / float(row["total_s"])
-                points.append((x_pos(float(np), 1, 4, left, right), y_pos(speedup, 0, 4, top, bottom, False)))
+                points.append((x_pos(float(np), x_min, x_max, left, right), y_pos(speedup, 0, y_max, top, bottom, False)))
         lines.append(
             f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in points)}" '
             f'fill="none" stroke="{colors[index]}" stroke-width="2.5"/>'
         )
         for x, y in points:
             lines.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{colors[index]}"/>')
-        lines.append(f'<text x="690" y="{78 + 24 * index}" fill="{colors[index]}">{prec}</text>')
+        draw_line_legend(lines, prec, colors[index], 78 + 24 * index)
 
-    for np in [1, 2, 4]:
-        x = x_pos(np, 1, 4, left, right)
-        lines.append(f'<text class="label" x="{x-5:.1f}" y="454">{np}</text>')
+    for np in np_values:
+        x = x_pos(float(np), x_min, x_max, left, right)
+        lines.append(f'<text class="label" x="{x-5:.1f}" y="454">{number_label(np)}</text>')
     lines.append('<text class="label" x="335" y="492">MPI processes</text>')
     return write_svg(path, lines)
 
@@ -331,23 +411,30 @@ def plot_strong_scaling(rows: list[dict[str, str]]) -> str:
 def plot_setup_solve(rows: list[dict[str, str]]) -> str:
     path = PLOTS / "setup_solve_p5_ref5_np1.svg"
     left, right, top, bottom = 80, 720, 60, 430
-    lines = svg_start("Setup and solve split, preconditioned methods")
+    p = last_value(rows, "p")
+    ref = last_value(rows, "refinements")
+    np = first_value(rows, "mpi_procs")
+    lines = svg_start(
+        f"Setup and solve split, p={number_label(p)}, ref={number_label(ref)}, np={number_label(np)}"
+    )
     draw_axes(lines, "seconds", left, right, top, bottom)
-    y_max = 0.28
-    draw_y_labels(lines, [("0", 0), ("0.07", 0.07), ("0.14", 0.14), ("0.21", 0.21), ("0.28", 0.28)], 0, y_max, top, bottom, False)
     methods = ["jacobi", "ssor", "ilu", "amg"]
+    selected = [row_for(rows, np, p, ref, prec) for prec in methods]
+    totals = [float(row["pc_setup_s"]) + float(row["solve_s"]) for row in selected if row]
+    y_max = max(totals) * 1.2 if totals else 1.0
+    y_labels = [(f"{y_max * fraction:g}", y_max * fraction) for fraction in [0, 0.25, 0.5, 0.75, 1]]
+    draw_y_labels(lines, y_labels, 0, y_max, top, bottom, False)
     slot = (right - left) / len(methods)
-    max_total = 0.28
 
     for index, prec in enumerate(methods):
-        row = row_for(rows, "1", "5", "5", prec)
+        row = row_for(rows, np, p, ref, prec)
         if not row:
             continue
         setup = float(row["pc_setup_s"])
         solve = float(row["solve_s"])
         total = setup + solve
-        setup_h = setup * (bottom - top) / max_total
-        solve_h = solve * (bottom - top) / max_total
+        setup_h = setup * (bottom - top) / y_max
+        solve_h = solve * (bottom - top) / y_max
         x = left + slot * index + slot * 0.25
         width = slot * 0.50
         lines.append(f'<rect x="{x:.1f}" y="{bottom-solve_h:.1f}" width="{width:.1f}" height="{solve_h:.1f}" fill="#1d4ed8"/>')
