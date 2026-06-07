@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Build, run, and summarize the heterogeneous diffusion benchmark."""
-
 from __future__ import annotations
 
 import csv
@@ -67,7 +64,7 @@ def run_experiment(np: int, launcher: str) -> int:
         command = f"source {SETUP} && {launcher} {flag} {np} {EXECUTABLE}"
     else:
         (RESULT / f"run_np{np}.log").write_text(
-            "No MPI launcher found after sourcing setup_modules.sh.\n",
+            "mpi launcher missing\n",
             encoding="utf-8",
         )
         return 127
@@ -263,8 +260,8 @@ def plot_iterations_vs_p(rows: list[dict[str, str]]) -> str:
     ]
     max_iterations = positive_max([float(row["iterations"]) for row in selected], 10.0)
     y_max = 10 ** math.ceil(math.log10(max_iterations))
-    lines = svg_start(f"Iterations vs heterogeneity, ref={number_label(ref)}, np={number_label(np)}")
-    draw_axes(lines, "CG iterations, log scale", left, right, top, bottom)
+    lines = svg_start(f"iters vs p, ref={number_label(ref)}, np={number_label(np)}")
+    draw_axes(lines, "CG iters, log", left, right, top, bottom)
     draw_y_labels(
         lines,
         [("1", 1), ("10", 10), ("100", 100), ("1k", 1000), ("10k", 10000)],
@@ -294,7 +291,7 @@ def plot_iterations_vs_p(rows: list[dict[str, str]]) -> str:
     for p_value in p_values:
         x = x_pos(float(p_value), float(p_values[0]), float(p_values[-1]), left, right)
         lines.append(f'<text class="label" x="{x-5:.1f}" y="454">{number_label(p_value)}</text>')
-    lines.append('<text class="label" x="335" y="492">heterogeneity exponent p</text>')
+    lines.append('<text class="label" x="335" y="492">p</text>')
     return write_svg(path, lines)
 
 
@@ -314,9 +311,9 @@ def plot_total_time(rows: list[dict[str, str]]) -> str:
     y_min = 10 ** math.floor(math.log10(min_time))
     y_max = 10 ** math.ceil(math.log10(max_time))
     lines = svg_start(
-        f"Total time by preconditioner, p={number_label(p)}, ref={number_label(ref)}, np={number_label(np)}"
+        f"total time, p={number_label(p)}, ref={number_label(ref)}, np={number_label(np)}"
     )
-    draw_axes(lines, "seconds, log scale", left, right, top, bottom)
+    draw_axes(lines, "seconds, log", left, right, top, bottom)
     draw_y_labels(
         lines,
         [(f"{value:g}", value) for value in [y_min, y_min * 10, y_min * 100, y_max] if value <= y_max],
@@ -361,7 +358,7 @@ def plot_strong_scaling(rows: list[dict[str, str]]) -> str:
                 if row:
                     speedups.append(serial_time / float(row["total_s"]))
     y_max = max(x_max, math.ceil(positive_max(speedups, x_max)))
-    lines = svg_start(f"Strong scaling, p={number_label(p)}, ref={number_label(ref)}")
+    lines = svg_start(f"strong scaling, p={number_label(p)}, ref={number_label(ref)}")
     draw_axes(lines, "speedup", left, right, top, bottom)
     draw_y_labels(
         lines,
@@ -404,7 +401,7 @@ def plot_strong_scaling(rows: list[dict[str, str]]) -> str:
     for np in np_values:
         x = x_pos(float(np), x_min, x_max, left, right)
         lines.append(f'<text class="label" x="{x-5:.1f}" y="454">{number_label(np)}</text>')
-    lines.append('<text class="label" x="335" y="492">MPI processes</text>')
+    lines.append('<text class="label" x="335" y="492">np</text>')
     return write_svg(path, lines)
 
 
@@ -415,7 +412,7 @@ def plot_setup_solve(rows: list[dict[str, str]]) -> str:
     ref = last_value(rows, "refinements")
     np = first_value(rows, "mpi_procs")
     lines = svg_start(
-        f"Setup and solve split, p={number_label(p)}, ref={number_label(ref)}, np={number_label(np)}"
+        f"setup/solve, p={number_label(p)}, ref={number_label(ref)}, np={number_label(np)}"
     )
     draw_axes(lines, "seconds", left, right, top, bottom)
     methods = ["jacobi", "ssor", "ilu", "amg"]
