@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="520" viewBox="0 0 860 520">
+<style>text{font-family:Arial,sans-serif;font-size:13px;fill:#1f2933}.title{font-size:20px;font-weight:700}.grid{stroke:#d9e2ec}.axis{stroke:#243b53;stroke-width:1.3}.label{fill:#52606d;font-size:12px}</style>
+<rect width="100%" height="100%" fill="white"/>
+<text class="title" x="70" y="34">Total time by preconditioner, p=5, ref=5, np=1</text>
+<line class="grid" x1="80" y1="60.0" x2="760" y2="60.0"/>
+<line class="grid" x1="80" y1="152.5" x2="760" y2="152.5"/>
+<line class="grid" x1="80" y1="245.0" x2="760" y2="245.0"/>
+<line class="grid" x1="80" y1="337.5" x2="760" y2="337.5"/>
+<line class="grid" x1="80" y1="430.0" x2="760" y2="430.0"/>
+<line class="axis" x1="80" y1="430" x2="760" y2="430"/>
+<line class="axis" x1="80" y1="430" x2="80" y2="60"/>
+<text class="label" transform="translate(24 310) rotate(-90)">seconds, log scale</text>
+<text class="label" x="42" y="434.0">0.1</text>
+<text class="label" x="42" y="249.0">1</text>
+<text class="label" x="42" y="64.0">10</text>
+<text class="label" x="42" y="64.0">10</text>
+<rect x="109.9" y="98.8" width="76.2" height="331.2" fill="#1d4ed8"/>
+<text class="label" x="109.9" y="454">none</text>
+<text class="label" x="109.9" y="90.8">6.17s</text>
+<rect x="245.9" y="351.9" width="76.2" height="78.1" fill="#dc2626"/>
+<text class="label" x="245.9" y="454">jacobi</text>
+<text class="label" x="245.9" y="343.9">0.264s</text>
+<rect x="381.9" y="355.9" width="76.2" height="74.1" fill="#059669"/>
+<text class="label" x="381.9" y="454">ssor</text>
+<text class="label" x="381.9" y="347.9">0.252s</text>
+<rect x="517.9" y="374.0" width="76.2" height="56.0" fill="#7c3aed"/>
+<text class="label" x="517.9" y="454">ilu</text>
+<text class="label" x="517.9" y="366.0">0.201s</text>
+<rect x="653.9" y="391.3" width="76.2" height="38.7" fill="#ea580c"/>
+<text class="label" x="653.9" y="454">amg</text>
+<text class="label" x="653.9" y="383.3">0.162s</text>
+</svg>

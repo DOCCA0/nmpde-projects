@@ -35,5 +35,6 @@
 
 build/*
 *.cache
-result/*
+# result/*
 *.pyc
+
