@@ -37,3 +37,4 @@ mpirun -n 4 ./build/elliptic 3 3 amg
 # 4. Run the Python benchmarking script
 python3 src/script/benchmark_preconditioners.py
 ```
+
