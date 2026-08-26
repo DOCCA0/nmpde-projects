@@ -6,6 +6,8 @@ The provided `setup_modules.sh` script handles this for you. It must be `source`
 
 ## Full Reproduction Command Sequence
 
+### First Time
+
 ```bash
 # 1. Load required modules into the current shell
 source setup_modules.sh
@@ -20,3 +22,19 @@ cd ..
 # 3. Run the Python benchmarking script
 python3 src/script/benchmark_preconditioners.py
 ```
+### After building to run/compile again
+
+```bash
+# 1. Load required modules into the current shell
+source setup_modules.sh
+
+# 2. Configure and build the C++ executable
+cmake --build build
+
+# 3. try a parallel single case
+mpirun -n 4 ./build/elliptic 3 3 amg
+
+# 4. Run the Python benchmarking script
+python3 src/script/benchmark_preconditioners.py
+```
+
