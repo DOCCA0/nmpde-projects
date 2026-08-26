@@ -1,6 +1,7 @@
 #include "HeterogeneousDiffusion.hpp"
 
 #include <iostream>
+#include <filesystem>
 
 std::vector<HeterogeneousDiffusion::Ball>
 HeterogeneousDiffusion::make_balls()
@@ -38,7 +39,6 @@ HeterogeneousDiffusion::HeterogeneousDiffusion(
 void
 HeterogeneousDiffusion::setup_and_assemble()
 {
-  // Case metadata (parsed by the Python benchmark script).
   pcout << "mpi_procs "   << mpi_size     << std::endl;
   pcout << "p "           << p            << std::endl;
   pcout << "refinements " << refinements  << std::endl;
@@ -242,13 +242,19 @@ HeterogeneousDiffusion::output(const std::string &tag) const
   TrilinosWrappers::MPI::Vector solution_ghost(locally_owned_dofs,
                                                locally_relevant_dofs,
                                                mpi_communicator);
-  solution_ghost = solution;
 
+  const std::string folder = "output/";
+  if (mpi_rank == 0)
+    std::filesystem::create_directories(folder);
+  MPI_Barrier(mpi_communicator);
+  
+  
+  solution_ghost = solution;
   DataOut<dim> data_out;
   data_out.attach_dof_handler(dof_handler);
   data_out.add_data_vector(solution_ghost, "solution");
 
-  // Cell-wise diffusion coefficient (locally-owned cells only).
+  
   Vector<double>       mu_field(mesh.n_active_cells());
   DiffusionCoefficient diffusion(p, balls);
   for (const auto &cell : mesh.active_cell_iterators())
@@ -261,7 +267,6 @@ HeterogeneousDiffusion::output(const std::string &tag) const
   const std::string basename = "heterogeneous-" + tag + "-p" +
                                std::to_string(int(p)) + "-ref" +
                                std::to_string(refinements);
-  data_out.write_vtu_with_pvtu_record("./", basename, 0, mpi_communicator);
-
-  pcout << "vtk " << basename << ".pvtu" << std::endl;
+  data_out.write_vtu_with_pvtu_record(folder, basename, 0, mpi_communicator);
+  pcout << "vtk " << folder << basename << ".pvtu" << std::endl;
 }
