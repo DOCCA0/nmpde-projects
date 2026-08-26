@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="860" height="520" viewBox="0 0 860 520">
 <style>text{font-family:Arial,sans-serif;font-size:13px;fill:#1f2933}.title{font-size:20px;font-weight:700}.grid{stroke:#d9e2ec}.axis{stroke:#243b53;stroke-width:1.3}.label{fill:#52606d;font-size:12px}</style>
 <rect width="100%" height="100%" fill="white"/>
-<text class="title" x="70" y="34">Strong scaling, p=5, ref=5</text>
+<text class="title" x="70" y="34">strong scaling, p=5, ref=5</text>
 <line class="grid" x1="80" y1="60.0" x2="650" y2="60.0"/>
 <line class="grid" x1="80" y1="152.5" x2="650" y2="152.5"/>
 <line class="grid" x1="80" y1="245.0" x2="650" y2="245.0"/>
@@ -11,51 +11,52 @@
 <line class="axis" x1="80" y1="430" x2="80" y2="60"/>
 <text class="label" transform="translate(24 310) rotate(-90)">speedup</text>
 <text class="label" x="42" y="434.0">0</text>
-<text class="label" x="42" y="341.5">1</text>
-<text class="label" x="42" y="249.0">2</text>
-<text class="label" x="42" y="156.5">3</text>
-<text class="label" x="42" y="64.0">4</text>
-<polyline points="80.0,337.5 270.0,245.0 460.0,152.5 650.0,60.0" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="6,5"/>
+<text class="label" x="42" y="360.0">1</text>
+<text class="label" x="42" y="286.0">2</text>
+<text class="label" x="42" y="212.0">3</text>
+<text class="label" x="42" y="138.0">4</text>
+<text class="label" x="42" y="64.0">5</text>
+<polyline points="80.0,356.0 270.0,282.0 460.0,208.0 650.0,134.0" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="6,5"/>
 <line x1="690" y1="198.0" x2="724" y2="198.0" stroke="#64748b" stroke-width="3" stroke-dasharray="6,5"/>
 <circle cx="707" cy="198.0" r="3.5" fill="#64748b"/>
 <text x="734" y="202.0">ideal</text>
-<polyline points="80.0,337.5 270.0,249.3 460.0,212.1 650.0,141.5" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
-<circle cx="80.0" cy="337.5" r="4" fill="#1d4ed8"/>
-<circle cx="270.0" cy="249.3" r="4" fill="#1d4ed8"/>
-<circle cx="460.0" cy="212.1" r="4" fill="#1d4ed8"/>
-<circle cx="650.0" cy="141.5" r="4" fill="#1d4ed8"/>
+<polyline points="80.0,356.0 270.0,256.9 460.0,215.8 650.0,204.6" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+<circle cx="80.0" cy="356.0" r="4" fill="#1d4ed8"/>
+<circle cx="270.0" cy="256.9" r="4" fill="#1d4ed8"/>
+<circle cx="460.0" cy="215.8" r="4" fill="#1d4ed8"/>
+<circle cx="650.0" cy="204.6" r="4" fill="#1d4ed8"/>
 <line x1="690" y1="78.0" x2="724" y2="78.0" stroke="#1d4ed8" stroke-width="3"/>
 <circle cx="707" cy="78.0" r="3.5" fill="#1d4ed8"/>
 <text x="734" y="82.0">none</text>
-<polyline points="80.0,337.5 270.0,236.0 460.0,200.3 650.0,149.0" fill="none" stroke="#dc2626" stroke-width="2.5"/>
-<circle cx="80.0" cy="337.5" r="4" fill="#dc2626"/>
-<circle cx="270.0" cy="236.0" r="4" fill="#dc2626"/>
-<circle cx="460.0" cy="200.3" r="4" fill="#dc2626"/>
-<circle cx="650.0" cy="149.0" r="4" fill="#dc2626"/>
+<polyline points="80.0,356.0 270.0,217.8 460.0,158.5 650.0,96.7" fill="none" stroke="#dc2626" stroke-width="2.5"/>
+<circle cx="80.0" cy="356.0" r="4" fill="#dc2626"/>
+<circle cx="270.0" cy="217.8" r="4" fill="#dc2626"/>
+<circle cx="460.0" cy="158.5" r="4" fill="#dc2626"/>
+<circle cx="650.0" cy="96.7" r="4" fill="#dc2626"/>
 <line x1="690" y1="102.0" x2="724" y2="102.0" stroke="#dc2626" stroke-width="3"/>
 <circle cx="707" cy="102.0" r="3.5" fill="#dc2626"/>
 <text x="734" y="106.0">jacobi</text>
-<polyline points="80.0,337.5 270.0,387.5 460.0,377.5 650.0,370.9" fill="none" stroke="#059669" stroke-width="2.5"/>
-<circle cx="80.0" cy="337.5" r="4" fill="#059669"/>
-<circle cx="270.0" cy="387.5" r="4" fill="#059669"/>
-<circle cx="460.0" cy="377.5" r="4" fill="#059669"/>
-<circle cx="650.0" cy="370.9" r="4" fill="#059669"/>
+<polyline points="80.0,356.0 270.0,371.4 460.0,358.1 650.0,343.8" fill="none" stroke="#059669" stroke-width="2.5"/>
+<circle cx="80.0" cy="356.0" r="4" fill="#059669"/>
+<circle cx="270.0" cy="371.4" r="4" fill="#059669"/>
+<circle cx="460.0" cy="358.1" r="4" fill="#059669"/>
+<circle cx="650.0" cy="343.8" r="4" fill="#059669"/>
 <line x1="690" y1="126.0" x2="724" y2="126.0" stroke="#059669" stroke-width="3"/>
 <circle cx="707" cy="126.0" r="3.5" fill="#059669"/>
 <text x="734" y="130.0">ssor</text>
-<polyline points="80.0,337.5 270.0,290.3 460.0,242.3 650.0,228.0" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
-<circle cx="80.0" cy="337.5" r="4" fill="#7c3aed"/>
-<circle cx="270.0" cy="290.3" r="4" fill="#7c3aed"/>
-<circle cx="460.0" cy="242.3" r="4" fill="#7c3aed"/>
-<circle cx="650.0" cy="228.0" r="4" fill="#7c3aed"/>
+<polyline points="80.0,356.0 270.0,273.8 460.0,237.4 650.0,221.3" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<circle cx="80.0" cy="356.0" r="4" fill="#7c3aed"/>
+<circle cx="270.0" cy="273.8" r="4" fill="#7c3aed"/>
+<circle cx="460.0" cy="237.4" r="4" fill="#7c3aed"/>
+<circle cx="650.0" cy="221.3" r="4" fill="#7c3aed"/>
 <line x1="690" y1="150.0" x2="724" y2="150.0" stroke="#7c3aed" stroke-width="3"/>
 <circle cx="707" cy="150.0" r="3.5" fill="#7c3aed"/>
 <text x="734" y="154.0">ilu</text>
-<polyline points="80.0,337.5 270.0,292.2 460.0,301.4 650.0,296.0" fill="none" stroke="#ea580c" stroke-width="2.5"/>
-<circle cx="80.0" cy="337.5" r="4" fill="#ea580c"/>
-<circle cx="270.0" cy="292.2" r="4" fill="#ea580c"/>
-<circle cx="460.0" cy="301.4" r="4" fill="#ea580c"/>
-<circle cx="650.0" cy="296.0" r="4" fill="#ea580c"/>
+<polyline points="80.0,356.0 270.0,230.5 460.0,242.8 650.0,280.2" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+<circle cx="80.0" cy="356.0" r="4" fill="#ea580c"/>
+<circle cx="270.0" cy="230.5" r="4" fill="#ea580c"/>
+<circle cx="460.0" cy="242.8" r="4" fill="#ea580c"/>
+<circle cx="650.0" cy="280.2" r="4" fill="#ea580c"/>
 <line x1="690" y1="174.0" x2="724" y2="174.0" stroke="#ea580c" stroke-width="3"/>
 <circle cx="707" cy="174.0" r="3.5" fill="#ea580c"/>
 <text x="734" y="178.0">amg</text>
@@ -63,5 +64,5 @@
 <text class="label" x="265.0" y="454">2</text>
 <text class="label" x="455.0" y="454">3</text>
 <text class="label" x="645.0" y="454">4</text>
-<text class="label" x="335" y="492">MPI processes</text>
+<text class="label" x="335" y="492">np</text>
 </svg>
