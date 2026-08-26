@@ -152,6 +152,10 @@ HeterogeneousDiffusion::solve_with(const Preconditioner &preconditioner,
   SolverControl solver_control(20000, 1e-10 * system_rhs.l2_norm());
   SolverCG<TrilinosWrappers::MPI::Vector> solver(solver_control);
 
+  double condition_number = -1.0;
+  solver.connect_condition_number_slot(
+    [&condition_number](const double cn) { condition_number = cn; });
+
   Timer timer;
   solver.solve(system_matrix, solution, system_rhs, preconditioner);
   timer.stop();
@@ -163,7 +167,8 @@ HeterogeneousDiffusion::solve_with(const Preconditioner &preconditioner,
 
   pcout << "result " << name << " " << solver_control.last_step() << " "
         << setup_time_global << " " << solve_time << " "
-        << setup_time_global + solve_time << std::endl;
+        << setup_time_global + solve_time << " " << condition_number
+        << std::endl;
 
   return solver_control.last_step();
 }

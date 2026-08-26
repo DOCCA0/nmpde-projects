@@ -18,7 +18,7 @@ MPI_PROCS = [1, 2, 3, 4]
 PRECONDITIONERS = ["none", "jacobi", "ssor", "ilu", "amg"]
 
 RESULT_RE = re.compile(
-    r"^result\s+(\S+)\s+(\d+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)"
+    r"^result\s+(\S+)\s+(\d+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)(?:\s+([0-9.eE+-]+))?"
 )
 
 
@@ -110,10 +110,11 @@ def parse_run_log(np: int, return_code: int) -> list[dict[str, str]]:
                 current
                 | {
                     "preconditioner": match.group(1),
-                    "iterations": match.group(2),
-                    "pc_setup_s": match.group(3),
-                    "solve_s": match.group(4),
-                    "total_s": match.group(5),
+                    "iterations":     match.group(2),
+                    "pc_setup_s":     match.group(3),
+                    "solve_s":        match.group(4),
+                    "total_s":        match.group(5),
+                    "condition_number": match.group(6) or "",
                 }
             )
 
@@ -137,6 +138,7 @@ def write_csv(rows: list[dict[str, str]]) -> None:
         "pc_setup_s",
         "solve_s",
         "total_s",
+        "condition_number"
     ]
     with CSV_FILE.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=columns)
