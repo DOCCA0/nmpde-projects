@@ -16,7 +16,6 @@ CSV_FILE = RESULT / "benchmark_results.csv"
 
 MPI_PROCS = [1, 2, 3, 4]
 PRECONDITIONERS = ["none", "jacobi", "ssor", "ilu", "amg"]
-WEAK_SCALING_PAIRS = [(1, 3), (2, 4), (4, 5)]
 
 RESULT_RE = re.compile(
     r"^result\s+(\S+)\s+(\d+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)\s+([0-9.eE+-]+)(?:\s+([0-9.eE+-]+))?"
@@ -499,8 +498,6 @@ def plot_optimality(rows: list[dict[str, str]]) -> str:
     lines.append('<text class="label" x="335" y="492">refinements</text>')
     return write_svg(path, lines)
 
-
-def plot_weak_scaling(rows: list[dict[str, str]]) -> str:
     """Efficiency = t(base) / t(np) along (np, ref) pairs; ideal = 1.0."""
     path = PLOTS / "weak_scaling_p5.svg"
     left, right, top, bottom = 80, 650, 60, 430
@@ -561,6 +558,61 @@ def plot_weak_scaling(rows: list[dict[str, str]]) -> str:
     lines.append('<text class="label" x="335" y="492">np</text>')
     return write_svg(path, lines)
 
+def plot_iterations_vs_refinement(rows: list[dict[str, str]]) -> str:
+    """Iterations vs mesh refinement for all p, np=1. Flat curves = h-optimal."""
+    path = PLOTS / "iterations_vs_refinement_np1.svg"
+    left, right, top, bottom = 80, 650, 60, 430
+    colors = ["#1d4ed8", "#dc2626", "#059669", "#7c3aed", "#ea580c"]
+
+    np = first_value(rows, "mpi_procs")
+    refs = sorted_values(rows, "refinements")
+    p_values = sorted_values(rows, "p")
+    if not (refs and p_values):
+        return ""
+
+    p = p_values[-1]
+
+    selected = [
+        row for row in rows
+        if row["mpi_procs"] == np and row["p"] == p
+    ]
+    max_it = positive_max([float(r["iterations"]) for r in selected], 10.0)
+    y_max = 10 ** math.ceil(math.log10(max_it))
+    x_min, x_max = float(refs[0]), float(refs[-1])
+
+    lines = svg_start(
+        f"iters vs refinement, p={number_label(p)}, np={number_label(np)}"
+    )
+    draw_axes(lines, "CG iters, log", left, right, top, bottom)
+    draw_y_labels(
+        lines,
+        [(str(v), v) for v in [1, 10, 100, 1000, 10000] if v <= y_max],
+        1, y_max, top, bottom, True,
+    )
+
+    for index, prec in enumerate(PRECONDITIONERS):
+        points = []
+        for ref in refs:
+            row = row_for(rows, np, p, ref, prec)
+            if row and float(row["iterations"]) > 0:
+                x = x_pos(float(ref), x_min, x_max, left, right)
+                y = y_pos(float(row["iterations"]), 1, y_max, top, bottom, True)
+                points.append((x, y))
+        if not points:
+            continue
+        lines.append(
+            f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in points)}" '
+            f'fill="none" stroke="{colors[index]}" stroke-width="2.5"/>'
+        )
+        for x, y in points:
+            lines.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{colors[index]}"/>')
+        draw_line_legend(lines, prec, colors[index], 78 + 24 * index)
+
+    for ref in refs:
+        x = x_pos(float(ref), x_min, x_max, left, right)
+        lines.append(f'<text class="label" x="{x-5:.1f}" y="454">{number_label(ref)}</text>')
+    lines.append('<text class="label" x="335" y="492">refinements</text>')
+    return write_svg(path, lines)
 
 def write_plots(rows: list[dict[str, str]]) -> list[str]:
     PLOTS.mkdir(parents=True, exist_ok=True)
@@ -571,8 +623,7 @@ def write_plots(rows: list[dict[str, str]]) -> list[str]:
         plot_total_time(rows),
         plot_strong_scaling(rows),
         plot_setup_solve(rows),
-        plot_optimality(rows),
-        plot_weak_scaling(rows),
+        plot_optimality(rows)
     ]
 
 

@@ -11,26 +11,26 @@
 <line class="axis" x1="80" y1="430" x2="80" y2="60"/>
 <text class="label" transform="translate(24 310) rotate(-90)">seconds</text>
 <text class="label" x="42" y="434.0">0</text>
-<text class="label" x="42" y="341.5">0.191064</text>
-<text class="label" x="42" y="249.0">0.382127</text>
-<text class="label" x="42" y="156.5">0.573191</text>
-<text class="label" x="42" y="64.0">0.764254</text>
-<rect x="120.0" y="123.4" width="80.0" height="306.6" fill="#1d4ed8"/>
-<rect x="120.0" y="121.7" width="80.0" height="1.8" fill="#ea580c"/>
+<text class="label" x="42" y="341.5">0.148278</text>
+<text class="label" x="42" y="249.0">0.296556</text>
+<text class="label" x="42" y="156.5">0.444834</text>
+<text class="label" x="42" y="64.0">0.593112</text>
+<rect x="120.0" y="205.9" width="80.0" height="224.1" fill="#1d4ed8"/>
+<rect x="120.0" y="204.5" width="80.0" height="1.4" fill="#ea580c"/>
 <text class="label" x="120.0" y="454">jacobi</text>
-<text class="label" x="120.0" y="113.7">0.637s</text>
-<rect x="280.0" y="141.3" width="80.0" height="288.7" fill="#1d4ed8"/>
-<rect x="280.0" y="139.7" width="80.0" height="1.6" fill="#ea580c"/>
+<text class="label" x="120.0" y="196.5">0.362s</text>
+<rect x="280.0" y="122.7" width="80.0" height="307.3" fill="#1d4ed8"/>
+<rect x="280.0" y="121.7" width="80.0" height="1.1" fill="#ea580c"/>
 <text class="label" x="280.0" y="454">ssor</text>
-<text class="label" x="280.0" y="131.7">0.6s</text>
-<rect x="440.0" y="237.5" width="80.0" height="192.5" fill="#1d4ed8"/>
-<rect x="440.0" y="211.4" width="80.0" height="26.1" fill="#ea580c"/>
+<text class="label" x="280.0" y="113.7">0.494s</text>
+<rect x="440.0" y="208.3" width="80.0" height="221.7" fill="#1d4ed8"/>
+<rect x="440.0" y="180.9" width="80.0" height="27.4" fill="#ea580c"/>
 <text class="label" x="440.0" y="454">ilu</text>
-<text class="label" x="440.0" y="203.4">0.452s</text>
-<rect x="600.0" y="322.8" width="80.0" height="107.2" fill="#1d4ed8"/>
-<rect x="600.0" y="220.9" width="80.0" height="101.9" fill="#ea580c"/>
+<text class="label" x="440.0" y="172.9">0.399s</text>
+<rect x="600.0" y="320.2" width="80.0" height="109.8" fill="#1d4ed8"/>
+<rect x="600.0" y="266.3" width="80.0" height="53.9" fill="#ea580c"/>
 <text class="label" x="600.0" y="454">amg</text>
-<text class="label" x="600.0" y="212.9">0.432s</text>
+<text class="label" x="600.0" y="258.3">0.262s</text>
 <rect x="750" y="72" width="14" height="14" fill="#ea580c"/><text x="772" y="84">setup</text>
 <rect x="750" y="98" width="14" height="14" fill="#1d4ed8"/><text x="772" y="110">solve</text>
 </svg>
