@@ -38,7 +38,9 @@ build/*
 # result/*
 *.pyc
 
+result/
 output/
 *.vtu
 *.pvtu
+*.pvd
 

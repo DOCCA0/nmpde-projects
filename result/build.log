@@ -1,3 +1,0 @@
-[ 33%] Building CXX object CMakeFiles/elliptic.dir/src/src_elliptic/HeterogeneousDiffusion.cpp.o
-[ 66%] Linking CXX executable elliptic
-[100%] Built target elliptic
