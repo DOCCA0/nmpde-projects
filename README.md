@@ -4,37 +4,94 @@ This project requires the `deal.II` library and a specific `gcc` toolchain, whic
 
 The provided `setup_modules.sh` script handles this for you. It must be `source`d for the changes to take effect in your current shell.
 
-## Full Reproduction Command Sequence
+## Requirements
 
-### First Time
+- deal.II ≥ 9.5.1 (with Trilinos and MPI support)
+- CMake ≥ 3.13
+- C++17 compiler
+- Python 3.8+ (for the benchmark script; no external packages needed)
+
 
 ```bash
-# 1. Load required modules into the current shell
 source setup_modules.sh
+```
 
-# 2. Configure and build the C++ executable
-mkdir -p build
-cd build
+## Building
+
+```bash
+mkdir -p build && cd build
 cmake ..
-cmake --build .
+make -j$(nproc)
 cd ..
-
-# 3. Run the Python benchmarking script
-python3 src/script/benchmark_preconditioners.py
 ```
-### After building to run/compile again
+
+### 1. Verification mode
+
+Runs a manufactured-solution convergence test with μ = 1 (homogeneous),
+using u(x,y,z) = sin(πx) sin(πy) sin(πz). Prints an L²/H¹ convergence
+table. Expected rates: L² = 2.0, H¹ = 1.0 (Q1 elements).
 
 ```bash
-# 1. Load required modules into the current shell
-source setup_modules.sh
+./build/elliptic verify              # refinements 3 to 5
+./build/elliptic verify 2 6          # refinements 2 to 6
+mpirun -n 4 ./build/elliptic verify  # parallel
+```
 
-# 2. Configure and build the C++ executable
-cmake --build build
+### 2. Single-case mode
 
-# 3. try a parallel single case
-mpirun -n 4 ./build/elliptic 3 3 amg
+Run one (p, refinement, preconditioner) combination. Writes `.pvtu` output
+for ParaView.
 
-# 4. Run the Python benchmarking script
+```bash
+# All 5 preconditioners at p=3, refinement 4
+./build/elliptic 3 4
+ 
+# Only AMG at p=5, refinement 5, with 4 MPI processes
+mpirun -n 4 ./build/elliptic 5 5 amg
+```
+
+### 3. Full sweep mode (no arguments)
+
+Sweeps all combinations of p ∈ {1,2,3,4,5}, refinements ∈ {3,4,5}, and
+all 5 preconditioners. Used by the benchmark script.
+
+```bash
+./build/elliptic
+```
+
+## Running the full benchmark
+
+The Python script automates the sweep across MPI process counts {1, 2, 3, 4},
+collects structured logs, and produces:
+
+```bash
 python3 src/script/benchmark_preconditioners.py
 ```
 
+**Outputs:**
+- `result/benchmark_results.csv` — All timing and iteration data
+- `result/plots/iterations_vs_heterogeneity_ref5_np1.svg` — CG iterations vs p
+- `result/plots/total_time_p5_ref5_np1.svg` — Total solve time comparison
+- `result/plots/strong_scaling_p5_ref5.svg` — Speedup vs MPI processes
+- `result/plots/setup_solve_p5_ref5_np1.svg` — Setup vs solve time breakdown
+- `result/plots/optimality_p5_np1.svg` — Iterations vs mesh refinement (h-optimality)
+## Visualization
+
+ParaView output (`.pvtu` files) is written to `output/` and includes:
+- `solution` — the computed solution field
+- `mu` — the diffusion coefficient field (showing the sphere inclusions)
+```bash
+# Generate output for a specific case
+mpirun -n 4 ./build/elliptic 5 4 amg
+# Open output/heterogeneous-amg-p5-ref4.pvtu in ParaView
+```
+
+## Verification results
+
+```
+--- convergence verification (mu = 1) ---
+    h             L2               H1
+1.2500e-01 5.7462e-03     - 2.1818e-01     -
+6.2500e-02 1.4367e-03  2.00 1.0905e-01  1.00
+3.1250e-02 3.5919e-04  2.00 5.4524e-02  1.00
+```
