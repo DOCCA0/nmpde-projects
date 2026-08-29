@@ -7,6 +7,8 @@
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/base/convergence_table.h>
+#include <deal.II/fe/mapping_q1.h>
 
 #include <deal.II/distributed/tria.h>
 
@@ -90,10 +92,52 @@ public:
     }
   };
 
+    class ManufacturedSolution : public Function<dim>
+    {
+    public:
+      double
+      value(const Point<dim>  &point,
+            const unsigned int /*component*/ = 0) const override
+      {
+        return std::sin(M_PI * point[0]) * std::sin(M_PI * point[1]) *
+               std::sin(M_PI * point[2]);
+      }
+
+      Tensor<1, dim>
+      gradient(const Point<dim>  &point,
+               const unsigned int /*component*/ = 0) const override
+      {
+        Tensor<1, dim> g;
+        const double   sx = std::sin(M_PI * point[0]);
+        const double   sy = std::sin(M_PI * point[1]);
+        const double   sz = std::sin(M_PI * point[2]);
+        const double   cx = std::cos(M_PI * point[0]);
+        const double   cy = std::cos(M_PI * point[1]);
+        const double   cz = std::cos(M_PI * point[2]);
+        g[0] = M_PI * cx * sy * sz;
+        g[1] = M_PI * sx * cy * sz;
+        g[2] = M_PI * sx * sy * cz;
+        return g;
+      }
+    };
+
+    class ManufacturedRightHandSide : public Function<dim>
+    {
+    public:
+      double
+      value(const Point<dim>  &point,
+            const unsigned int /*component*/ = 0) const override
+      {
+        return 3.0 * M_PI * M_PI * std::sin(M_PI * point[0]) *
+               std::sin(M_PI * point[1]) * std::sin(M_PI * point[2]);
+      }
+    };
+
   // Constructor.
-  HeterogeneousDiffusion(const unsigned int refinements_,
-                         const double       p_,
-                         const MPI_Comm     mpi_communicator_);
+    HeterogeneousDiffusion(const unsigned int refinements_,
+                           const double       p_,
+                           const MPI_Comm     mpi_communicator_,
+                           const bool         verify_mode_ = false);
 
   // Mesh, DoFs, sparsity, and matrix/rhs assembly. Call once per case.
   void
@@ -101,6 +145,9 @@ public:
 
   void
   solve(const std::string &preconditioner_name);
+
+  double
+  compute_error(const VectorTools::NormType &norm_type) const;
 
   void
   output(const std::string &tag) const;
@@ -120,6 +167,7 @@ protected:
   MPI_Comm           mpi_communicator;
   const unsigned int mpi_size;
   const unsigned int mpi_rank;
+  const bool verify_mode;
   ConditionalOStream pcout;
 
   std::vector<Ball> balls;
