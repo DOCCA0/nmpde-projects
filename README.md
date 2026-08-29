@@ -1,6 +1,21 @@
-## Environment Setup
+# Preconditioning Heterogeneous Diffusion Problems
 
-This project requires the `deal.II` library and a specific `gcc` toolchain, which are managed by an environment module system. Before building the project, you must load these modules into your current shell session.
+## Problem description
+
+We solve the 3D Poisson problem with heterogeneous diffusion on Ω = (0, 1)³:
+
+```
+-∇·(μ ∇u) = f   in Ω
+        u = 0   on ∂Ω
+```
+
+The diffusion coefficient μ(x) varies by orders of magnitude across the domain:
+- μ(x) = 10^p if x lies inside any of 12 predefined spheres
+- μ(x) = 1 otherwise
+  where p > 0 controls the strength of heterogeneity.
+
+We investigate the effectiveness, optimality, and parallel scalability of five
+preconditioning strategies available in the deal.II `TrilinosWrappers` namespace
 
 The provided `setup_modules.sh` script handles this for you. It must be `source`d for the changes to take effect in your current shell.
 
