@@ -49,7 +49,7 @@ $$
 
 and outside the balls $\mu=1$.
 
-![Coefficient field for p=5](plots/mu.png)
+![Coefficient field for p=5](result/plots/mu.png)
 
 ## Weak And Discrete Form
 
@@ -158,7 +158,7 @@ $3,4,5$.
 
 ## Figures
 
-![Iterations vs heterogeneity](plots/iterations_vs_heterogeneity_ref5_np1.svg)
+![Iterations vs heterogeneity](result/plots/iterations_vs_heterogeneity_ref5_np1.svg)
 
 **Observation:**
 
@@ -169,7 +169,7 @@ $3,4,5$.
 3. AMG keeps the iteration count nearly flat compared with the other methods,
    showing the best robustness with respect to coefficient contrast.
 
-![Total time by preconditioner](plots/total_time_p5_ref5_np1.svg)
+![Total time by preconditioner](result/plots/total_time_p5_ref5_np1.svg)
 
 **Observation:**
 
@@ -178,7 +178,7 @@ $3,4,5$.
 3. AMG has a nonzero setup cost, but the reduced iteration count makes it the
    fastest overall in this case.
 
-![Strong scaling](plots/strong_scaling_p5_ref5.svg)
+![Strong scaling](result/plots/strong_scaling_p5_ref5.svg)
 
 **Observation:**
 
@@ -189,7 +189,7 @@ $3,4,5$.
 3. ILU and AMG scale less ideally because factorization, triangular solves,
    setup, and coarse-grid work introduce stronger parallel overhead.
 
-![Setup and solve split](plots/setup_solve_p5_ref5_np1.svg)
+![Setup and solve split](result/plots/setup_solve_p5_ref5_np1.svg)
 
 **Observation:**
 
