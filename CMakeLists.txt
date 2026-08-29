@@ -17,5 +17,8 @@ set(DEAL_II_DIR "/u/sw/toolchains/gcc-glibc/11.2.0/pkgs/dealii/9.5.1/lib/cmake/d
 
 include(common/cmake-common.cmake)
 
-add_executable(elliptic src/src_elliptic/elliptic_main.cpp src/src_elliptic/Elliptic.cpp src/src_elliptic/Elliptic.hpp)
+add_executable(elliptic
+  src/src_elliptic/main.cpp
+  src/src_elliptic/HeterogeneousDiffusion.cpp)
+  
 deal_ii_setup_target(elliptic)
