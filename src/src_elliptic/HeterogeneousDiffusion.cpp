@@ -23,12 +23,14 @@ HeterogeneousDiffusion::make_balls()
 HeterogeneousDiffusion::HeterogeneousDiffusion(
   const unsigned int refinements_,
   const double       p_,
-  const MPI_Comm     mpi_communicator_)
+  const MPI_Comm     mpi_communicator_,
+  const bool         verify_mode_)
   : refinements(refinements_)
   , p(p_)
   , mpi_communicator(mpi_communicator_)
   , mpi_size(Utilities::MPI::n_mpi_processes(mpi_communicator_))
   , mpi_rank(Utilities::MPI::this_mpi_process(mpi_communicator_))
+  , verify_mode(verify_mode_)
   , pcout(std::cout, mpi_rank == 0)
   , balls(make_balls())
   , mesh(mpi_communicator_)
@@ -96,8 +98,13 @@ HeterogeneousDiffusion::setup_and_assemble()
   Vector<double>     cell_rhs(dofs_per_cell);
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
-  DiffusionCoefficient diffusion(p, balls);
-  RightHandSide        rhs;
+  DiffusionCoefficient      heterogeneous_diffusion(p, balls);
+  RightHandSide             heterogeneous_rhs;
+  ManufacturedRightHandSide manufactured_rhs;
+
+  const Function<dim> *rhs_ptr = verify_mode
+    ? static_cast<const Function<dim> *>(&manufactured_rhs)
+    : static_cast<const Function<dim> *>(&heterogeneous_rhs);
 
   system_matrix = 0.0;
   system_rhs    = 0.0;
@@ -113,7 +120,9 @@ HeterogeneousDiffusion::setup_and_assemble()
 
       for (unsigned int q = 0; q < n_q; ++q)
         {
-          const double mu = diffusion.value(fe_values.quadrature_point(q));
+          const double mu = verify_mode
+            ? 1.0
+            : heterogeneous_diffusion.value(fe_values.quadrature_point(q));
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
@@ -122,7 +131,7 @@ HeterogeneousDiffusion::setup_and_assemble()
                                      fe_values.shape_grad(j, q) *
                                      fe_values.JxW(q);
 
-              cell_rhs(i) += rhs.value(fe_values.quadrature_point(q)) *
+              cell_rhs(i) += rhs_ptr->value(fe_values.quadrature_point(q)) *
                              fe_values.shape_value(i, q) * fe_values.JxW(q);
             }
         }
@@ -234,6 +243,32 @@ HeterogeneousDiffusion::solve(const std::string &name)
     {
       pcout << "failed " << name << " " << exception.what() << std::endl;
     }
+}
+
+double
+HeterogeneousDiffusion::compute_error(
+  const VectorTools::NormType &norm_type) const
+{
+  TrilinosWrappers::MPI::Vector solution_ghost(locally_owned_dofs,
+                                               locally_relevant_dofs,
+                                               mpi_communicator);
+  solution_ghost = solution;
+
+  const QGauss<dim>    quadrature_error(fe.degree + 2);
+  const MappingQ1<dim> mapping;
+
+  ManufacturedSolution manufactured_solution;
+
+  Vector<double> error_per_cell(mesh.n_active_cells());
+  VectorTools::integrate_difference(mapping,
+                                    dof_handler,
+                                    solution_ghost,
+                                    manufactured_solution,
+                                    error_per_cell,
+                                    quadrature_error,
+                                    norm_type);
+
+  return VectorTools::compute_global_error(mesh, error_per_cell, norm_type);
 }
 
 void
