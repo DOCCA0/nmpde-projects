@@ -1,7 +1,18 @@
 #include "HeterogeneousDiffusion.hpp"
 
 #include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <fstream>
 #include <filesystem>
+
+namespace
+{
+  // Shared width for the dashed separators printed around the results
+  // table, so the footer under "Setup/Assembly time" and the separator
+  // under the "Precond | Iters | ..." header always line up.
+  constexpr std::size_t results_table_width = 74;
+}
 
 std::vector<HeterogeneousDiffusion::Ball>
 HeterogeneousDiffusion::make_balls()
@@ -35,34 +46,65 @@ HeterogeneousDiffusion::HeterogeneousDiffusion(
   , balls(make_balls())
   , mesh(mpi_communicator_)
   , fe(1)
+  , mapping(FE_SimplexP<dim>(1))
   , dof_handler(mesh)
 {}
 
 void
 HeterogeneousDiffusion::setup_and_assemble()
 {
-  pcout << "mpi_procs "   << mpi_size     << std::endl;
-  pcout << "p "           << p            << std::endl;
-  pcout << "refinements " << refinements  << std::endl;
-  pcout << "balls "       << balls.size() << std::endl;
+  {
+    std::ostringstream header;
+    header << "Case:  p = " << p << "   |  refinements = " << refinements
+           << "   |  MPI ranks = " << mpi_size
+           << "   |  balls = " << balls.size();
+
+    pcout << std::string(header.str().size(), '=') << std::endl;
+    pcout << header.str() << std::endl;
+    pcout << std::string(header.str().size(), '=') << std::endl;
+  }
 
   Timer timer;
 
-  GridGenerator::hyper_cube(mesh, 0.0, 1.0);
-  mesh.refine_global(refinements);
+  // Build the mesh directly from tetrahedra. The parameter `refinements`
+  // keeps the same meaning as in the hexahedral version: h = 2^{-r}.
+  // We therefore use 2^refinements subdivisions in every coordinate
+  // direction. The generator fills the unit cube directly with simplices.
+  {
+    Triangulation<dim> serial_tet_mesh;
+
+    const unsigned int subdivisions = 1u << refinements; // "<<" is a bit-wise left shift operator, equivalent to 2^refinements
+
+    GridGenerator::subdivided_hyper_cube_with_simplices(
+      serial_tet_mesh, subdivisions, 0.0, 1.0);
+
+    // Set subdomain ids on the serial tetrahedral mesh. These ids are then
+    // used when constructing the fully distributed triangulation.
+    GridTools::partition_triangulation(mpi_size, serial_tet_mesh);
+
+    const auto construction_data =
+      TriangulationDescription::Utilities::create_description_from_triangulation(
+        serial_tet_mesh, mpi_communicator);
+
+    mesh.create_triangulation(construction_data);
+  }
 
   dof_handler.distribute_dofs(fe);
 
   locally_owned_dofs = dof_handler.locally_owned_dofs();
   DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
 
-  constraints.clear();
-  constraints.reinit(locally_relevant_dofs);
-  VectorTools::interpolate_boundary_values(dof_handler,
-                                           0,
-                                           Functions::ZeroFunction<dim>(),
-                                           constraints);
-  constraints.close();
+  // Set up constraints for Dirichlet boundary conditions.
+  {
+    constraints.clear();
+    constraints.reinit(locally_relevant_dofs);
+    VectorTools::interpolate_boundary_values(mapping,
+                                            dof_handler,
+                                            0, // id of the boundary (0 = all boundaries)
+                                            Functions::ZeroFunction<dim>(),
+                                            constraints);
+    constraints.close();
+  }
 
   sparsity_pattern.reinit(locally_owned_dofs,
                           locally_owned_dofs,
@@ -76,8 +118,10 @@ HeterogeneousDiffusion::setup_and_assemble()
   system_rhs.reinit(locally_owned_dofs, mpi_communicator);
   solution.reinit(locally_owned_dofs, mpi_communicator);
 
-  pcout << "cells " << mesh.n_global_active_cells() << std::endl;
-  pcout << "dofs "  << dof_handler.n_dofs()         << std::endl;
+  pcout << std::left << std::setw(22) << "  Cells"
+        << mesh.n_global_active_cells() << std::endl;
+  pcout << std::left << std::setw(22) << "  DoFs"
+        << dof_handler.n_dofs() << std::endl;
 
   timer.stop();
   const double setup_time =
@@ -85,8 +129,9 @@ HeterogeneousDiffusion::setup_and_assemble()
 
   timer.restart();
 
-  const QGauss<dim> quadrature(fe.degree + 1);
-  FEValues<dim>     fe_values(fe,
+  const QGaussSimplex<dim> quadrature(fe.degree + 1);
+  FEValues<dim> fe_values(mapping,
+                          fe,
                           quadrature,
                           update_values | update_gradients |
                             update_quadrature_points | update_JxW_values);
@@ -126,17 +171,19 @@ HeterogeneousDiffusion::setup_and_assemble()
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
             {
+              cell_rhs(i) += rhs_ptr->value(fe_values.quadrature_point(q)) *
+                             fe_values.shape_value(i, q) * fe_values.JxW(q);
+
               for (unsigned int j = 0; j < dofs_per_cell; ++j)
+
                 cell_matrix(i, j) += mu * fe_values.shape_grad(i, q) *
                                      fe_values.shape_grad(j, q) *
                                      fe_values.JxW(q);
-
-              cell_rhs(i) += rhs_ptr->value(fe_values.quadrature_point(q)) *
-                             fe_values.shape_value(i, q) * fe_values.JxW(q);
             }
         }
 
       cell->get_dof_indices(local_dof_indices);
+      // Distribute the Dirichlet boundary conditions and assemble the local contributions into the global system.
       constraints.distribute_local_to_global(
         cell_matrix, cell_rhs, local_dof_indices, system_matrix, system_rhs);
     }
@@ -148,8 +195,15 @@ HeterogeneousDiffusion::setup_and_assemble()
   const double assembly_time =
     Utilities::MPI::max(timer.wall_time(), mpi_communicator);
 
-  pcout << "case_setup " << setup_time    << std::endl;
-  pcout << "assembly "   << assembly_time << std::endl;
+  static constexpr std::size_t table_width = results_table_width;
+
+  std::ostringstream setup_line, assembly_line;
+  setup_line    << std::left << std::setw(22) << "  Setup time [s]" << setup_time;
+  assembly_line << std::left << std::setw(22) << "  Assembly time [s]" << assembly_time;
+
+  pcout << setup_line.str() << std::endl;
+  pcout << assembly_line.str() << std::endl;
+  pcout << std::string(table_width, '-') << std::endl;
 }
 
 template <class Preconditioner>
@@ -174,12 +228,61 @@ HeterogeneousDiffusion::solve_with(const Preconditioner &preconditioner,
   const double setup_time_global =
     Utilities::MPI::max(setup_time, mpi_communicator);
 
-  pcout << "result " << name << " " << solver_control.last_step() << " "
-        << setup_time_global << " " << solve_time << " "
-        << setup_time_global + solve_time << " " << condition_number
-        << std::endl;
+  if (!result_header_printed)
+    {
+      std::ostringstream header;
+      header << std::left << std::setw(10) << "Precond" << std::right
+             << std::setw(8)  << "Iters"
+             << std::setw(14) << "SetupT[s]"
+             << std::setw(14) << "SolveT[s]"
+             << std::setw(14) << "TotalT[s]"
+             << std::setw(14) << "CondNumber";
+
+      pcout << header.str() << std::endl;
+      pcout << std::string(results_table_width, '-') << std::endl;
+      result_header_printed = true;
+    }
+
+  pcout << std::left << std::setw(10) << name << std::right
+        << std::setw(8)  << solver_control.last_step()
+        << std::setw(14) << std::scientific << std::setprecision(3)
+        << setup_time_global
+        << std::setw(14) << solve_time
+        << std::setw(14) << setup_time_global + solve_time
+        << std::setw(14) << condition_number
+        << std::defaultfloat << std::endl;
+
+  log_result_csv(
+    name, solver_control.last_step(), setup_time_global, solve_time,
+    condition_number);
 
   return solver_control.last_step();
+}
+
+void
+HeterogeneousDiffusion::log_result_csv(const std::string &name,
+                                       const unsigned int iterations,
+                                       const double       setup_time,
+                                       const double       solve_time,
+                                       const double condition_number) const
+{
+  if (mpi_rank != 0)
+    return;
+
+  const std::string filename    = "results.csv";
+  const bool        file_exists = std::filesystem::exists(filename);
+
+  std::ofstream csv(filename, std::ios::app);
+  if (!file_exists)
+    csv << "refinements,p,mpi_procs,cells,dofs,preconditioner,iterations,"
+           "setup_time,solve_time,total_time,condition_number"
+        << std::endl;
+
+  csv << refinements << "," << p << "," << mpi_size << ","
+      << mesh.n_global_active_cells() << "," << dof_handler.n_dofs() << ","
+      << name << "," << iterations << "," << setup_time << "," << solve_time
+      << "," << (setup_time + solve_time) << "," << condition_number
+      << std::endl;
 }
 
 void
@@ -229,8 +332,8 @@ HeterogeneousDiffusion::solve(const std::string &name)
           TrilinosWrappers::PreconditionAMG                 preconditioner;
           TrilinosWrappers::PreconditionAMG::AdditionalData data;
           data.elliptic              = true;
-          data.higher_order_elements = true;
-          data.n_cycles              = 1;
+          data.higher_order_elements = false;
+          data.n_cycles              = 1; // default 1 for benchmark
           preconditioner.initialize(system_matrix, data);
           timer.stop();
           solve_with(preconditioner, name, timer.wall_time());
@@ -254,8 +357,7 @@ HeterogeneousDiffusion::compute_error(
                                                mpi_communicator);
   solution_ghost = solution;
 
-  const QGauss<dim>    quadrature_error(fe.degree + 2);
-  const MappingQ1<dim> mapping;
+  const QGaussSimplex<dim> quadrature_error(fe.degree + 2);
 
   ManufacturedSolution manufactured_solution;
 
@@ -297,7 +399,7 @@ HeterogeneousDiffusion::output(const std::string &tag) const
       mu_field[cell->active_cell_index()] = diffusion.value(cell->center());
   data_out.add_data_vector(mu_field, "mu");
 
-  data_out.build_patches();
+  data_out.build_patches(mapping, fe.degree);
 
   const std::string basename = "heterogeneous-" + tag + "-p" +
                                std::to_string(int(p)) + "-ref" +

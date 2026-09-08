@@ -99,7 +99,7 @@ For $p>0$, define
  \end{cases}
  \label{eq:mu}
 \end{equation}
-We seek $u:\overline\Omega\rightarrow\mathbb{R}$ satisfying
+We look for $u:\overline\Omega\rightarrow\mathbb{R}$ satisfying
 \begin{equation}
  -\nabla\!\cdot(\mu_p\nabla u)=f\quad\text{in }\Omega,
  \qquad u=0\quad\text{on }\partial\Omega, \qquad f\equiv1.
@@ -136,8 +136,8 @@ For $u,v\in V$, Cauchy--Schwarz gives
 \end{equation}
 Since $\mu_p\ge1$ almost everywhere and Poincar\'e's inequality holds on $H_0^1(\Omega)$,
 \begin{equation}
- a(v,v)\ge |v|_{H^1(\Omega)}^2
- \ge C_P^{-2}\|v\|_{H^1(\Omega)}^2.
+    a(v,v) \ge |v|_{H^1(\Omega)}^2
+    \ge \frac{1}{1+C_P^2}\|v\|_{H^1(\Omega)}^2.
 \end{equation}
 The load is bounded by $|\ell(v)|\le\|f\|_{L^2}\|v\|_{L^2}\le
 C_P\|f\|_{L^2}|v|_{H^1}$. Lax--Milgram therefore yields a unique weak solution for every
@@ -164,10 +164,9 @@ reduce iterations but cost more memory, setup work, and synchronization.
 
 \newpage
 \section{Finite-element discretization}
-The unit cube is globally refined $r$ times into $8^r$ hexahedra. The code uses
-\texttt{FE\_Q<3>(1)}, the conforming space
+From the suitable discrete space:
 \begin{equation}
- V_h=\{v_h\in C^0(\overline\Omega):v_h|_K\in Q_1(K),\ v_h|_{\partial\Omega}=0\}.
+ V_h=\{v_h\in C^0(\overline\Omega):v_h|_K\in P_1(K),\ v_h|_{\partial\Omega}=0\}.
 \end{equation}
 Writing $u_h=\sum_{j=1}^{N_h}U_j\phi_j$ and testing with each nodal basis function gives
 \begin{equation}
@@ -207,7 +206,7 @@ the equations correctly) from the performance experiment (solving difficult syst
 Every system is solved by CG from the zero vector. The deal.II control object uses a maximum of
 20,000 iterations and the absolute tolerance
 \begin{equation}
- \|\boldsymbol r_k\|_2\le10^{-10}\|\boldsymbol b\|_2,
+ \|\boldsymbol r_k\|\le10^{-10}\|\boldsymbol b\|,
  \qquad \boldsymbol r_k=\boldsymbol b-A\boldsymbol U_k.
  \label{eq:stopping}
 \end{equation}

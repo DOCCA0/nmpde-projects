@@ -29,7 +29,7 @@ main(int argc, char **argv)
                                          mpi_communicator,
                                          /* verify_mode = */ true);
           problem.setup_and_assemble();
-          problem.solve("amg");   // faster preconditioner
+          problem.solve("amg");   // fastest preconditioner
 
           const double e_L2 = problem.compute_error(VectorTools::L2_norm);
           const double e_H1 = problem.compute_error(VectorTools::H1_norm);
@@ -40,9 +40,9 @@ main(int argc, char **argv)
         }
 
       table.evaluate_convergence_rates(
-        "L2", "h", ConvergenceTable::reduction_rate_log2);
+        "L2", ConvergenceTable::reduction_rate_log2);
       table.evaluate_convergence_rates(
-        "H1", "h", ConvergenceTable::reduction_rate_log2);
+        "H1", ConvergenceTable::reduction_rate_log2);
       table.set_scientific("L2", true);
       table.set_scientific("H1", true);
       table.set_scientific("h",  true);

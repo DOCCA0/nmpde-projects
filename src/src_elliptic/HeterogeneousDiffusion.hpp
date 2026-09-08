@@ -8,17 +8,19 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/base/convergence_table.h>
-#include <deal.II/fe/mapping_q1.h>
+#include <deal.II/fe/mapping_fe.h>
 
-#include <deal.II/distributed/tria.h>
+#include <deal.II/distributed/fully_distributed_tria.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_tools.h>
 
-#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_simplex_p.h>
 #include <deal.II/fe/fe_values.h>
 
 #include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_tools.h>
+#include <deal.II/grid/tria_description.h>
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/precondition.h>
@@ -37,7 +39,8 @@
 using namespace dealii;
 
 /**
- * 3D Poisson with heterogeneous diffusion coefficient.
+ * 3D Poisson with heterogeneous diffusion coefficient, discretized on a
+ * tetrahedral (P1 simplex) mesh.
  *
  *   -div(mu grad u) = f    in Omega = (0, 1)^3,
  *              u = 0       on d Omega,
@@ -50,6 +53,7 @@ class HeterogeneousDiffusion
 public:
   static constexpr unsigned int dim = 3;
 
+  // Ball struct for the heterogeneous domain. 
   struct Ball
   {
     Point<dim> center;
@@ -162,6 +166,15 @@ protected:
              const std::string    &name,
              const double          setup_time);
 
+  // Appends one row of solver results to results.csv (rank 0 only),
+  // writing the header the first time the file is created.
+  void
+  log_result_csv(const std::string &name,
+                 const unsigned int iterations,
+                 const double       setup_time,
+                 const double       solve_time,
+                 const double       condition_number) const;
+
   const unsigned int refinements;
   const double       p;
   MPI_Comm           mpi_communicator;
@@ -170,12 +183,18 @@ protected:
   const bool verify_mode;
   ConditionalOStream pcout;
 
+  // Tracks whether the results-table header has been printed for the
+  // current case, so it only appears once even though solve_with() is a
+  // template instantiated separately per preconditioner type.
+  mutable bool result_header_printed = false;
+
   std::vector<Ball> balls;
 
-  parallel::distributed::Triangulation<dim> mesh;
-  FE_Q<dim>                                 fe;
-  DoFHandler<dim>                           dof_handler;
-  AffineConstraints<double>                 constraints;
+  parallel::fullydistributed::Triangulation<dim> mesh;
+  FE_SimplexP<dim>                     fe;
+  const MappingFE<dim>                 mapping;
+  DoFHandler<dim>                      dof_handler;
+  AffineConstraints<double>            constraints;
 
   IndexSet locally_owned_dofs;
   IndexSet locally_relevant_dofs;
